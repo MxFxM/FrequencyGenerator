@@ -17,11 +17,11 @@ void loop() {
   boolean a = digitalReadFast(pin1);
   boolean b = digitalReadFast(pin2);
 
+  if (a || b) {
   Serial.print("Pin1: ");
   Serial.print(a);
   Serial.print("    Pin2: ");
   Serial.print(b);
   Serial.println();
-
-  delay(10);
+  }
 }
