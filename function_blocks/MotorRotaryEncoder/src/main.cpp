@@ -17,10 +17,24 @@ void setup() {
 
 volatile int change = 0;
 volatile int count = 0;
+volatile int integrator = 0;
 
 void loop() {
   // put your main code here, to run repeatedly:
 
+  integrator += change;
+  if (abs(integrator) > 10) {
+    change = change*10;
+  }
+  if (abs(integrator) > 20) {
+    change = change*10;
+  }
+  if (abs(integrator) > 30) {
+    change = change*10;
+  }
+  if (abs(integrator) > 40) {
+    change = change*10;
+  }
   count = count+change;
   change = 0;
   Serial.println(count);
