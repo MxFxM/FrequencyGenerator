@@ -1,0 +1,34 @@
+<Qucs Schematic 0.0.19>
+<Properties>
+  <View=0,0,1273,1327,1,0,0>
+  <Grid=10,10,0>
+  <DataSet=hdd_motor_simulation.dat>
+  <DataDisplay=hdd_motor_simulation.sch>
+  <OpenDisplay=1>
+  <Script=hdd_motor_simulation.m>
+  <RunScript=0>
+  <showFrame=0>
+  <FrameText0=Title>
+  <FrameText1=Drawn By:>
+  <FrameText2=Date:>
+  <FrameText3=Revision:>
+</Properties>
+<Symbol>
+</Symbol>
+<Components>
+</Components>
+<Wires>
+</Wires>
+<Diagrams>
+  <Rect 280 666 946 456 3 #c0c0c0 1 00 1 0 0.2 1 1 -0.1 0.5 1.1 1 -0.1 0.5 1.1 315 0 225 "" "" "">
+	<"Pr1.Vt@time" #0000ff 0 3 0 0 0>
+	<"Pr2.Vt@time" #ff0000 0 3 0 0 0>
+	<"Pr3.Vt@time" #ff00ff 0 3 0 0 0>
+  </Rect>
+  <Rect 270 1212 953 422 3 #c0c0c0 1 00 1 0 0.2 1 1 -0.1 0.5 1.1 1 -0.1 0.5 1.1 315 0 225 "" "" "">
+	<"Pr4.Vt@time" #0000ff 0 3 0 0 0>
+	<"Pr5.Vt@time" #ff0000 0 3 0 0 0>
+  </Rect>
+</Diagrams>
+<Paintings>
+</Paintings>
