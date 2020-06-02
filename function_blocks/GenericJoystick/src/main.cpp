@@ -21,6 +21,7 @@ void loop() {
   int raw_joystick_y = analogRead(JoystickY);
   boolean val_joystick_sw = digitalReadFast(JoystickSW);
 
+  // map to 5 different speeds (of change) in both directions
   int val_joystick_x = map(raw_joystick_x, 0, 1023, -5, 5);
   int val_joystick_y = map(raw_joystick_y, 0, 1023, -5, 5);
 
