@@ -22,4 +22,6 @@ void loop() {
   Serial.print("    Pin2: ");
   Serial.print(b);
   Serial.println();
+
+  delay(10);
 }
