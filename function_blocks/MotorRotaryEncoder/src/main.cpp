@@ -16,27 +16,26 @@ void setup() {
 }
 
 volatile int change = 0;
-volatile int count = 0;
-volatile int integrator = 0;
+int count = 0;
+boolean consecutive = false;
+int integrator = 0;
+long last_change_time = 0;
 
 void loop() {
   // put your main code here, to run repeatedly:
+  long time = micros(); // once to keep consistent timing over the loop
 
-  integrator += change;
-  if (abs(integrator) > 10) {
-    change = change*10;
+  if (change != 0) {
+    integrator = integrator+1;
+    int expo = floor(integrator/10.0);
+    count = count+change*pow(10, expo);
+    change = 0;
+    last_change_time = micros() + 100000; // one tenth second to reset exponential acceleration
   }
-  if (abs(integrator) > 20) {
-    change = change*10;
+
+  if (time > last_change_time) {
+    integrator = 0;
   }
-  if (abs(integrator) > 30) {
-    change = change*10;
-  }
-  if (abs(integrator) > 40) {
-    change = change*10;
-  }
-  count = count+change;
-  change = 0;
   Serial.println(count);
 
   delay(10);
