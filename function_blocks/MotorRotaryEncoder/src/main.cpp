@@ -28,9 +28,12 @@ void loop() {
   if (change != 0) {
     integrator = integrator+1;
     int expo = floor(integrator/10.0);
+    if (expo >= 5) { // not faster than 100k per count. thats fast enough for a value 0 < x < 20M
+      expo = 5;
+    }
     count = count+change*pow(10, expo);
     change = 0;
-    last_change_time = micros() + 100000; // one tenth second to reset exponential acceleration
+    last_change_time = time+ 300000; // one third second to reset exponential acceleration
   }
 
   if (time > last_change_time) {
