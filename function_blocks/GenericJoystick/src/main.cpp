@@ -9,7 +9,7 @@ void setup() {
 
   pinMode(JoystickX, INPUT);
   pinMode(JoystickY, INPUT);
-  pinMode(JoystickSW, INPUT_PULLUP);
+  pinMode(JoystickSW, INPUT_PULLDOWN);
 
   Serial.begin(9600);
 }
@@ -21,8 +21,8 @@ void loop() {
   int raw_joystick_y = analogRead(JoystickY);
   boolean val_joystick_sw = digitalReadFast(JoystickSW);
 
-  int val_joystick_x = map(raw_joystick_x, 0, 4095, -5, 5);
-  int val_joystick_y = map(raw_joystick_y, 0, 4095, -5, 5);
+  int val_joystick_x = map(raw_joystick_x, 0, 65000, -5, 5);
+  int val_joystick_y = map(raw_joystick_y, 0, 65000, -5, 5);
 
   Serial.print("X=");
   Serial.print(val_joystick_x);
