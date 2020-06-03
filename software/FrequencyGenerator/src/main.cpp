@@ -32,7 +32,7 @@ void setup() {
 }
 
 volatile int change = 0;
-int count = 0;
+int count = 1;
 boolean consecutive = false;
 int integrator = 0;
 long last_change_time = 0;
