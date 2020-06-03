@@ -2,6 +2,7 @@
 
 // include the library code:
 #include <LiquidCrystal.h>
+// the library uses delays but for my application that does not matter
 
 // initialize the library by associating any needed LCD interface pin
 // with the arduino pin number it is connected to
