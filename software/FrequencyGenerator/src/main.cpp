@@ -76,7 +76,7 @@ void loop() {
     change = 0;
 
     // save time for reset of integrator
-    last_change_time = time + 300000; // one third second to reset exponential acceleration
+    last_change_time = time + 500000; // one half second to reset exponential acceleration
 
     // toggle the buzzer
     buzzerState = !buzzerState;
@@ -93,7 +93,7 @@ void loop() {
     printFrequency(count);
 
     last_display_update = time + 200000;
-    last_change_time = last_change_time + 100000; // more time since display update takes a while
+    last_change_time = last_change_time + 200000; // more time since display update takes a while
   }
 
   delay(10);
