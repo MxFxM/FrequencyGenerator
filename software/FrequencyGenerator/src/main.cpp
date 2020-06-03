@@ -193,7 +193,11 @@ void printFrequency(int freq) {
     }
     // ones
     lcd.print(ones);
-  } // there is no else, since this cant be 0
+  } else {
+    if (millions != 0 || thousands != 0) {
+      lcd.print("000");
+    }
+  }
 
   // lcd.print(freq);
   lcd.print(" Hz");
