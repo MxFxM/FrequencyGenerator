@@ -3,6 +3,8 @@
 #define pin1 0
 #define pin2 1
 
+#define pinBuzzer 2
+
 void pinInterrupt(void);
 
 void setup() {
@@ -11,6 +13,8 @@ void setup() {
 
   pinMode(pin1, INPUT);
   pinMode(pin2, INPUT);
+
+  pinMode(pinBuzzer, OUTPUT);
 
   attachInterrupt(pin1, pinInterrupt, CHANGE);
 }
@@ -21,6 +25,7 @@ boolean consecutive = false;
 int integrator = 0;
 long last_change_time = 0;
 int last_change = 0;
+boolean buzzerState = false;
 
 void loop() {
   // put your main code here, to run repeatedly:
@@ -59,6 +64,10 @@ void loop() {
 
     // save time for reset of integrator
     last_change_time = time + 200000; // one fith second to reset exponential acceleration
+
+    // toggle the buzzer
+    buzzerState = !buzzerState;
+    digitalWriteFast(pinBuzzer, buzzerState);
   }
 
   // reset integrator if time is over
