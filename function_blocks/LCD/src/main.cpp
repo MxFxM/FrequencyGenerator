@@ -12,7 +12,7 @@ void setup() {
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
   // Print a message to the LCD.
-  lcd.print("hello, world!");
+  lcd.print("Frequency:");
 }
 
 void loop() {
@@ -33,13 +33,13 @@ void loop() {
     millions = floor(freq_temp / 1000000);
   }
 
-  freq_temp = freq_temp - millions;
+  freq_temp = freq_temp - millions * 1000000;
 
   if (freq_temp >= 1000) {
-    thousands = floor(freq / 1000);
+    thousands = floor(freq_temp / 1000);
   }
 
-  freq_temp = freq_temp - thousands;
+  freq_temp = freq_temp - thousands * 1000;
 
   ones = freq_temp;
 
