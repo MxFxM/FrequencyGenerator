@@ -51,7 +51,7 @@ void loop()
     updateDisplay = false;
   }
 
-  delay(100);
+  //  delay(100);
 }
 
 void ISR_RotaryPin1(void)
@@ -82,51 +82,54 @@ void ISR_RotaryPin2(void)
 
 void CounterUpdate(int change)
 {
-  // reset acceleration if direction was reversed
-  if (change != last_change)
-  {
-    integrator = 0;
-    last_change = change;
-  }
-
-  // increase integrator
-  integrator = integrator + 1;
-
-  // make integrator exponential
-  int expo = floor(integrator / 10.0);
-
-  // limit exponent
-  if (expo >= 5)
-  { // not faster than 100k per count. thats fast enough for a value 0 < x < 20M
-    expo = 5;
-  }
-
-  // increase count
-  count = count + change * pow(10, expo);
-
-  // limit count
-  if (count >= 20000000)
-  {
-    count = 20000000;
-  }
-  else if (count <= 0)
-  {
-    count = 0;
-  }
-
-  // reset change
-  change = 0;
-
   long time = micros();
 
-  // save time for reset of integrator
-  last_change_time = time + 200000; // one fith second to reset exponential acceleration
-
-  // reset integrator if time is over
-  if (time > last_change_time)
+  if (time > last_change_time + 50000)
   {
-    integrator = 0;
-  }
+    // reset acceleration if direction was reversed
+    if (change != last_change)
+    {
+      integrator = 0;
+      last_change = change;
+    }
 
-  updateDisplay = true;
+    // increase integrator
+    integrator = integrator + 1;
+
+    // make integrator exponential
+    int expo = floor(integrator / 10.0);
+
+    // limit exponent
+    if (expo >= 5)
+    { // not faster than 100k per count. thats fast enough for a value 0 < x < 20M
+      expo = 5;
+    }
+
+    // increase count
+    count = count + change * pow(10, expo);
+
+    // limit count
+    if (count >= 20000000)
+    {
+      count = 20000000;
+    }
+    else if (count <= 0)
+    {
+      count = 0;
+    }
+
+    // reset change
+    change = 0;
+
+    // save time for reset of integrator
+    last_change_time = time;
+
+    // reset integrator if time is over
+    if (time > last_change_time + 200000) // one fith second to reset exponential acceleration
+    {
+      integrator = 0;
+    }
+
+    updateDisplay = true;
+  }
 }
