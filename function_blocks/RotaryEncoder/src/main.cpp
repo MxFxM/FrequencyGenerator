@@ -1,48 +1,67 @@
 #include <Arduino.h>
 
-#define RotaryEncoderPin1 0
-#define RotaryEncoderPin2 1
+#define ENC_A 1
+#define ENC_B 2
 
-void isr_rotary_pin1(void);
-void isr_rotary_pin2(void);
+void read_encoder(void);
 
-void setup() {
-  // put your setup code here, to run once:
+volatile int counter;
+volatile boolean tick;
 
-  pinMode(RotaryEncoderPin1, INPUT_PULLUP);
-  pinMode(RotaryEncoderPin2, INPUT_PULLUP);
+void setup()
+{
+  pinMode(ENC_A, INPUT);
+  pinMode(ENC_B, INPUT);
 
-  Serial.begin(9600); // usb is always 12 Mbit/s
+  Serial.begin(9600);
+  Serial.println("Start");
 
-  attachInterrupt(RotaryEncoderPin1, isr_rotary_pin1, FALLING);
-  attachInterrupt(RotaryEncoderPin2, isr_rotary_pin2, FALLING);
+  counter = 0;
+  tick = false;
+
+  attachInterrupt(ENC_A, read_encoder, CHANGE);
+  attachInterrupt(ENC_B, read_encoder, CHANGE);
 }
 
-volatile boolean first = first;
-int rotary_change = 0;
-uint16_t counter = 0;
+void loop()
+{
+  // do some stuff here - the joy of interrupts is that they take care of themselves
+  Serial.println(counter);
+  delay(100);
+}
 
-void loop() {
-  // put your main code here, to run repeatedly:
-  delay(10);
-  if (rotary_change != 0) {
-    counter = counter + rotary_change;
-    rotary_change = 0;
-    Serial.println(counter);
+void read_encoder()
+{
+  static uint8_t previousState = 3;
+
+  uint8_t newA = digitalReadFast(ENC_A);
+  uint8_t newB = digitalReadFast(ENC_B);
+
+  uint8_t newState = (newA << 1) | newB;
+
+  if (newState != previousState) {
+    if (newState == 3 && previousState == 2 && tick) {
+      counter = counter + 1;
+      tick = false;
+    } else
+
+    if (newState == 3 && previousState == 1 && tick) {
+      counter = counter - 1;
+      tick = false;
+    } else
+
+    if (newState == 2 && previousState == 0 && !tick) {
+      tick = true;
+    } else
+
+    if (newState == 1 && previousState == 0 && !tick) {
+      tick = true;
+    } else
+
+    {
+      tick = false;
+    }
+
+    previousState = newState;
   }
-}
-
-void isr_rotary_pin1(void) {
-  //
-  if (first) { // read slow as some sort of debounce
-    rotary_change = 1;
-  } else {
-    rotary_change = -1;
-    first = true;
-  }
-}
-
-void isr_rotary_pin2(void) {
-  //
-  first = false;
 }
