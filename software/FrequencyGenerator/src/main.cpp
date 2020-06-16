@@ -1,5 +1,13 @@
 #include <Arduino.h>
 
+// ------------------------------------------------------------------------------------------------
+// General
+// ------------------------------------------------------------------------------------------------
+//#define DEBUG_MODE
+
+// ------------------------------------------------------------------------------------------------
+// LCD
+// ------------------------------------------------------------------------------------------------
 // library for the lcd
 // the library uses delays but for my application that does not matter
 // i might remove the delays later tho
@@ -13,26 +21,81 @@
 #define LCD_D6 3
 #define LCD_D7 2
 
-// some other values used for the display
+// settings
 #define LCD_UPDATE_TIME 100000
 
-// create lcd object
+// lcd object
 LiquidCrystal lcd(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 
+// functions
+void setupLCD(void);
+void printFrequency(int freq);
+
+// ------------------------------------------------------------------------------------------------
+// Rotary Encoder
+// ------------------------------------------------------------------------------------------------
 // the pins for the rotary encoder
 #define ROT_DT 0
 #define ROT_CK 1
 #define ROT_SW 2
 
-void printFrequency(int freq);
+// settings for the frequency counter
+#define MAX_COUNTER_VALUE 10000000
+#define MIN_COUNTER_VALUE 1
 
+// functions
+void setupRotaryEncoder(void);
+void readEncoder(void);
+void confirmFrequency(void);
+void setFrequency(int frequency);
+
+// variables
+volatile int rot_counter = 1;
+volatile int rot_previousCounter = 0;
+volatile boolean rot_autoset = false;
+
+// ------------------------------------------------------------------------------------------------
+// MAIN
+// ------------------------------------------------------------------------------------------------
 void setup() {
-  // set up the lcd with width and height
-  lcd.begin(16, 2);
+  #ifdef DEBUG_MODE
+  // debug
+  Serial.begin(9600); // usb is always 12 Mbit/s
+  #endif
+
+  setupLCD();
+
+  setupRotaryEncoder();
 }
 
 void loop() {
   long time = micros(); // once to keep consistent timing over the loop
+
+  // only update display if value changed
+  if (rot_counter != rot_previousCounter) {
+    rot_previousCounter = rot_counter;
+    printFrequency(rot_counter);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+// Functions
+// ------------------------------------------------------------------------------------------------
+void setupLCD(void) {
+  // set up the lcd with width and height
+  lcd.begin(16, 2);
+}
+
+void setupRotaryEncoder(void) {
+  // pin directions
+  pinMode(ROT_CK, INPUT);
+  pinMode(ROT_DT, INPUT);
+  pinMode(ROT_SW, INPUT_PULLUP);
+
+  // interrupts
+  attachInterrupt(ROT_CK, readEncoder, CHANGE);
+  attachInterrupt(ROT_DT, readEncoder, CHANGE);
+  attachInterrupt(ROT_SW, confirmFrequency, FALLING);
 }
 
 void printFrequency(int freq) {
@@ -136,4 +199,65 @@ void printFrequency(int freq) {
 
   // lcd.print(freq);
   lcd.print(" Hz");
+}
+
+void read_encoder()
+{
+  static uint8_t previousState = 3;
+  static boolean tick = false;
+
+  uint8_t newA = digitalReadFast(ENC_A);
+  uint8_t newB = digitalReadFast(ENC_B);
+
+  uint8_t newState = (newA << 1) | newB;
+
+  if (newState != previousState) {
+    if (newState == 3 && previousState == 2 && tick) {
+      rot_counter = rot_counter + 1;
+      if (rot_counter >= MAX_COUNTER_VALUE) {
+        rot_counter = MAX_COUNTER_VALUE;
+      }
+      if (rot_autoset) {
+        setFrequency(rot_counter);
+      }
+      tick = false;
+    } else if (newState == 3 && previousState == 1 && tick) {
+      rot_counter = rot_counter - 1;
+      if (rot_counter <= MIN_COUNTER_VALUE) {
+        rot_counter = MIN_COUNTER_VALUE;
+      }
+      if (rot_autoset) {
+        setFrequency(rot_counter);
+      }
+      tick = false;
+    } else if (newState == 2 && previousState == 0 && !tick) {
+      tick = true;
+    } else if (newState == 1 && previousState == 0 && !tick) {
+      tick = true;
+    } else {
+      tick = false;
+    }
+
+    previousState = newState;
+  }
+}
+
+void confirm_frequency() {
+  static long lastConfirm = 0;
+  long time = micros();
+
+  if (time > lastConfirm + 100000) {
+    setFrequency(rot_counter);
+    #ifdef DEBUG_MODE
+    Serial.print("Confirmed: ");
+    #endif
+    Serial.println(rot_counter);
+    lastConfirm = time;
+  }
+}
+
+void setFrequency(int frequency) {
+  #ifdef DEBUG_MODE
+  Serial.println("set");
+  #endif
 }
