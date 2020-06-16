@@ -89,6 +89,10 @@ uint8_t message_hotstart[]  = {0xB5, 0x62, 0x06, 0x04, 0x04, 0x00, 0xFF, 0xFF, 0
 void calcCRC(uint8_t* message);
 void configureTimepulse(uint32_t freq, uint32_t freqLock, double pulseRatio, double pulseRatioLock);
 void setupGPS(void);
+void readGPS(void);
+
+uint8_t gps_inputBuffer[100];
+uint8_t gps_inputBufferIndex = 0;
 
 // ------------------------------------------------------------------------------------------------
 // State machine and menus
@@ -133,6 +137,8 @@ void setup() {
   #ifdef DEBUG_MODE
   // debug
   Serial.begin(9600); // usb is always 12 Mbit/s
+
+  while (Serial.available() <= 0) {}
   #endif
 
   setupLCD();
@@ -152,6 +158,8 @@ void setup() {
 
 void loop() {
   long time = micros(); // once to keep consistent timing over the loop
+
+  readGPS();
 
   digitalWriteFast(LED_YELLOW, error);
   digitalWriteFast(LED_GREEN, locked);
@@ -824,4 +832,46 @@ void setFrequency(boolean reference) {
   }
 
   configureTimepulse(fn, fl, dn, dl);
+}
+
+void readGPS(void) {
+  uint8_t newBytes = GPS.available();
+
+  for (uint8_t newByte = 0; newByte < newBytes; newByte++) {
+    gps_inputBuffer[gps_inputBufferIndex] = GPS.read();
+    #ifdef DEBUG_MODE
+    Serial.write(gps_inputBuffer[gps_inputBufferIndex]);
+    #endif
+    gps_inputBufferIndex++;
+
+    if (gps_inputBuffer[0] == 0x24) {
+      // correct start byte
+      if (gps_inputBuffer[gps_inputBufferIndex-1] == 0x0A && gps_inputBuffer[gps_inputBufferIndex-2] == 0x0D) {
+        // carriage return and linefeed = complete message
+        if (gps_inputBuffer[3] == 0x52 && gps_inputBuffer[4] == 0x4D && gps_inputBuffer[5] == 0x43) {
+          // the correct RMC message
+          uint8_t validityByteIndex = 0;
+          uint8_t commaCounter = 0;
+          for (uint8_t index = 6; index < gps_inputBufferIndex; index++) {
+            if (gps_inputBuffer[index] == 0x2C) {
+              commaCounter++;
+              if (commaCounter >= 2) {
+                validityByteIndex = index + 1;
+                break;
+              }
+            }
+          }
+          if (gps_inputBuffer[validityByteIndex] == 0x41) {
+            locked = true;
+          } else {
+            locked = false;
+          }
+        }
+        gps_inputBufferIndex = 0;
+      }
+    } else {
+      // wrong start byte, clear buffer
+      gps_inputBufferIndex = 0;
+    }
+  }
 }
