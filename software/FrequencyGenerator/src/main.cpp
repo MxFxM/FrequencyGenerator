@@ -35,9 +35,9 @@ void printFrequency(int freq);
 // Rotary Encoder
 // ------------------------------------------------------------------------------------------------
 // the pins for the rotary encoder
-#define ROT_DT 0
-#define ROT_CK 1
-#define ROT_SW 2
+#define ROT_CK 19
+#define ROT_DT 18
+#define ROT_SW 17
 
 // settings for the frequency counter
 #define MAX_COUNTER_VALUE 10000000
@@ -201,13 +201,13 @@ void printFrequency(int freq) {
   lcd.print(" Hz");
 }
 
-void read_encoder()
+void readEncoder()
 {
   static uint8_t previousState = 3;
   static boolean tick = false;
 
-  uint8_t newA = digitalReadFast(ENC_A);
-  uint8_t newB = digitalReadFast(ENC_B);
+  uint8_t newA = digitalReadFast(ROT_CK);
+  uint8_t newB = digitalReadFast(ROT_DT);
 
   uint8_t newState = (newA << 1) | newB;
 
@@ -242,7 +242,7 @@ void read_encoder()
   }
 }
 
-void confirm_frequency() {
+void confirmFrequency() {
   static long lastConfirm = 0;
   long time = micros();
 
