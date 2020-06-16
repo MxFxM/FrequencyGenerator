@@ -5,6 +5,11 @@
 // ------------------------------------------------------------------------------------------------
 //#define DEBUG_MODE
 
+// acceleration in frequency and dutycycle change
+#define MAX_FREQUENCY_EXPO 5
+#define MAX_DUTYCYCLE_EXPO 1
+#define ACCELERATION_RESET_MICROS 500000
+
 // settings for push button debounce
 #define BUTTON_DEBOUNCE_MICROS 10000
 #define BUTTON_LONG_PRESS_MICROS 500000
@@ -14,8 +19,8 @@
 #define MIN_FREQUENCY_VALUE 1
 
 // settings for dutycycle
-#define MAX_DUTYCYCLE_VALYE 1000
-#define MIN_DUTYCYCLE_VALYE 1
+#define MAX_DUTYCYCLE_VALUE 1000
+#define MIN_DUTYCYCLE_VALUE 1
 
 // ------------------------------------------------------------------------------------------------
 // LCD
@@ -128,6 +133,16 @@ boolean error = false;
 boolean locked = false;
 boolean enabled = false;
 
+// acceleration in changing frequency and dutycycle
+enum directions
+{
+  upwards,
+  downwards
+} direction;
+directions lastDirection = upwards;
+int integrator;
+volatile long lastChangeTime;
+
 void setFrequency(boolean reference);
 
 // ------------------------------------------------------------------------------------------------
@@ -166,6 +181,10 @@ void loop() {
   enabled = locked || !option_waitgps;
   digitalWriteFast(LED_BLUE, enabled);
 
+  if (time > lastChangeTime + ACCELERATION_RESET_MICROS) {
+    integrator = 0;
+  }
+
   main_states next_state = main_state;
 
   switch (main_state)
@@ -174,8 +193,22 @@ void loop() {
       // only update display if value changed
       if (rot_counter != rot_previousCounter) {
 
-        // replace with acceleration
-        main_frequency = main_frequency + (rot_counter - rot_previousCounter);
+        int change = (rot_counter - rot_previousCounter);
+        if (change > 0) {
+          direction = upwards;
+        } else {
+          direction = downwards;
+        }
+        if (direction != lastDirection) {
+          integrator = 0;
+          lastDirection = direction;
+        }
+        integrator = integrator + abs(change);
+        int expo = floor(integrator/10.0);
+        if (expo > MAX_FREQUENCY_EXPO) { // limit to 100k
+          expo = MAX_FREQUENCY_EXPO;
+        }
+        main_frequency = main_frequency + change * pow(10, expo);
 
         if (main_frequency >= MAX_FREQUENCY_VALUE) {
           main_frequency = MAX_FREQUENCY_VALUE;
@@ -206,13 +239,27 @@ void loop() {
       // only update display if value changed
       if (rot_counter != rot_previousCounter) {
 
-        // replace with acceleration
-        main_dutycycle = main_dutycycle + (rot_counter - rot_previousCounter);
+        int change = (rot_counter - rot_previousCounter);
+        if (change > 0) {
+          direction = upwards;
+        } else {
+          direction = downwards;
+        }
+        if (direction != lastDirection) {
+          integrator = 0;
+          lastDirection = direction;
+        }
+        integrator = integrator + abs(change);
+        int expo = floor(integrator/10.0);
+        if (expo > MAX_DUTYCYCLE_EXPO) {
+          expo = MAX_DUTYCYCLE_EXPO;
+        }
+        main_dutycycle = main_dutycycle + change * pow(10, expo);
 
-        if (main_dutycycle >= MAX_DUTYCYCLE_VALYE) {
-          main_dutycycle = MAX_DUTYCYCLE_VALYE;
-        } else if (main_dutycycle <= MIN_DUTYCYCLE_VALYE) {
-          main_dutycycle = MIN_DUTYCYCLE_VALYE;
+        if (main_dutycycle >= MAX_DUTYCYCLE_VALUE) {
+          main_dutycycle = MAX_DUTYCYCLE_VALUE;
+        } else if (main_dutycycle <= MIN_DUTYCYCLE_VALUE) {
+          main_dutycycle = MIN_DUTYCYCLE_VALUE;
         }
 
         rot_previousCounter = rot_counter;
@@ -679,6 +726,7 @@ void printOptions(void) {
 
 void readEncoder(void)
 {
+  long time = micros();
   static uint8_t previousState = 3;
   static boolean tick = false;
 
@@ -690,9 +738,11 @@ void readEncoder(void)
   if (newState != previousState) {
     if (newState == 3 && previousState == 2 && tick) {
       rot_counter = rot_counter + 1;
+      lastChangeTime = time;
       tick = false;
     } else if (newState == 3 && previousState == 1 && tick) {
       rot_counter = rot_counter - 1;
+      lastChangeTime = time;
       tick = false;
     } else if (newState == 2 && previousState == 0 && !tick) {
       tick = true;
