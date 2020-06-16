@@ -118,9 +118,13 @@ main_states main_menu;
 boolean option_autoset = false;
 boolean option_waitgps = true;
 
+boolean main_reference = false;
+
 boolean error = false;
 boolean locked = false;
 boolean enabled = false;
+
+void setFrequency(boolean reference);
 
 // ------------------------------------------------------------------------------------------------
 // MAIN
@@ -135,6 +139,12 @@ void setup() {
 
   setupRotaryEncoder();
 
+  setupGPS();
+
+  pinMode(LED_YELLOW, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);
+  pinMode(LED_BLUE, OUTPUT);
+
   // enty point for main state machine
   main_state = state_menu;
   main_menu = state_set_frequency;
@@ -145,6 +155,7 @@ void loop() {
 
   digitalWriteFast(LED_YELLOW, error);
   digitalWriteFast(LED_GREEN, locked);
+  enabled = locked || !option_waitgps;
   digitalWriteFast(LED_BLUE, enabled);
 
   main_states next_state = main_state;
@@ -168,7 +179,7 @@ void loop() {
         printFrequency(main_frequency);
 
         if (option_autoset) {
-          //setFrequency(main_frequency);
+          setFrequency(false);
         }
       } else if (rot_long_press) {
         main_menu = state_set_frequency;
@@ -177,7 +188,7 @@ void loop() {
         rot_long_press = false;
       } else if (rot_short_press) {
         if (!option_autoset) {
-          // set frequency
+          setFrequency(false);
         }
         rot_short_press = false;
       }
@@ -200,7 +211,7 @@ void loop() {
         printDutyCycle(main_dutycycle);
 
         if (option_autoset) {
-          //setFrequency(main_frequency);
+          setFrequency(false);
         }
       } else if (rot_long_press) {
         main_menu = state_set_dutycycle;
@@ -209,7 +220,7 @@ void loop() {
         rot_long_press = false;
       } else if (rot_short_press) {
         if (!option_autoset) {
-          // set dutycycle
+          setFrequency(false);
         }
         rot_short_press = false;
       }
@@ -286,18 +297,28 @@ void loop() {
         case state_wait_gps:
           option_waitgps = !option_waitgps;
           printOptions();
+          setFrequency(main_reference);
           break;
         
         case state_reset_cold:
           // send reset to gps module
+          calcCRC(&message_coldstart[0]);
+          GPS.write(message_coldstart, sizeof(message_coldstart));
+          delay(200);
           break;
         
         case state_reset_warm:
           // send reset to gps module
+          calcCRC(&message_warmstart[0]);
+          GPS.write(message_warmstart, sizeof(message_warmstart));
+          delay(200);
           break;
 
         case state_reset_hot:
           // send reset to gps module
+          calcCRC(&message_hotstart[0]);
+          GPS.write(message_hotstart, sizeof(message_hotstart));
+          delay(200);
           break;
         
         default:
@@ -361,11 +382,13 @@ void loop() {
         case state_set_frequency:
           next_state = state_set_frequency;
           printFrequency(main_frequency);
+          main_reference = false;
           break;
 
         case state_set_dutycycle:
           next_state = state_set_dutycycle;
           printDutyCycle(main_dutycycle);
+          main_reference = false;
           break;
         
         case state_reference_output:
@@ -374,6 +397,8 @@ void loop() {
           lcd.print("Reference Output");
           lcd.setCursor(0, 1);
           lcd.print("10 MHz    50.0 %");
+          setFrequency(true);
+          main_reference = true;
           break;
         
         case state_options:
@@ -419,8 +444,11 @@ void setupRotaryEncoder(void) {
 
 void setupGPS(void) {
   GPS.begin(9600);
-  delay(500);
-  configureTimepulse(1, 1, 0, 0);
+  delay(300);
+  calcCRC(&message_coldstart[0]);
+  GPS.write(message_coldstart, sizeof(message_coldstart));
+  delay(200);
+  configureTimepulse(1, 1, 0.0, 50.0);
 }
 
 void printFrequency(int freq) {
@@ -771,4 +799,29 @@ void configureTimepulse(uint32_t freq, uint32_t freqLock, double pulseRatio, dou
 
   calcCRC(&message[0]);
   GPS.write(message, sizeof(message));
+}
+
+void setFrequency(boolean reference) {
+  int fn;
+  int fl;
+  double dn;
+  double dl;
+
+  if (reference) {
+    fn = 10000000;
+    dn = 50.0;
+  } else {
+    fn = main_frequency;
+    dn = double(main_dutycycle/1000.0);
+  }
+
+  fl = fn;
+  dl = dn;
+
+  if (option_waitgps) {
+    fn = 1;
+    dn = 0.0;
+  }
+
+  configureTimepulse(fn, fl, dn, dl);
 }
