@@ -313,6 +313,7 @@ void loop() {
           calcCRC(&message_coldstart[0]);
           GPS.write(message_coldstart, sizeof(message_coldstart));
           delay(200);
+          setFrequency(main_reference);
           break;
         
         case state_reset_warm:
@@ -320,6 +321,7 @@ void loop() {
           calcCRC(&message_warmstart[0]);
           GPS.write(message_warmstart, sizeof(message_warmstart));
           delay(200);
+          setFrequency(main_reference);
           break;
 
         case state_reset_hot:
@@ -327,6 +329,7 @@ void loop() {
           calcCRC(&message_hotstart[0]);
           GPS.write(message_hotstart, sizeof(message_hotstart));
           delay(200);
+          setFrequency(main_reference);
           break;
         
         default:
