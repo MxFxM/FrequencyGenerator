@@ -5,6 +5,14 @@
 // ------------------------------------------------------------------------------------------------
 //#define DEBUG_MODE
 
+// settings for the frequency counter
+#define MAX_FREQUENCY_VALUE 10000000
+#define MIN_FREQUENCY_VALUE 1
+
+// settings for dutycycle
+#define MAX_DUTYCYCLE_VALYE 1000
+#define MIN_DUTYCYCLE_VALYE 1
+
 // ------------------------------------------------------------------------------------------------
 // LCD
 // ------------------------------------------------------------------------------------------------
@@ -30,6 +38,7 @@ LiquidCrystal lcd(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 // functions
 void setupLCD(void);
 void printFrequency(int freq);
+void printDutyCycle(int dc);
 
 // ------------------------------------------------------------------------------------------------
 // Rotary Encoder
@@ -39,9 +48,6 @@ void printFrequency(int freq);
 #define ROT_DT 18
 #define ROT_SW 17
 
-// settings for the frequency counter
-#define MAX_COUNTER_VALUE 10000000
-#define MIN_COUNTER_VALUE 1
 
 // functions
 void setupRotaryEncoder(void);
@@ -50,9 +56,35 @@ void confirmFrequency(void);
 void setFrequency(int frequency);
 
 // variables
-volatile int rot_counter = 1;
-volatile int rot_previousCounter = 0;
+volatile int rot_counter = 0;
+volatile int rot_previousCounter = 1;
 volatile boolean rot_autoset = false;
+
+// ------------------------------------------------------------------------------------------------
+// State machine and menus
+// ------------------------------------------------------------------------------------------------
+enum main_states
+{
+  state_set_frequency,
+  state_set_dutycycle,
+  state_reference_output,
+  state_options,
+  state_menu
+} main_state;
+
+enum main_options
+{
+  state_autoset,
+  state_wait_gps,
+  state_reset_cold,
+  state_reset_warm,
+  state_reset_hot,
+  state_exit_options
+} main_option;
+
+int main_frequency = 2;
+int main_dutycycle = 501;
+main_states main_menu;
 
 // ------------------------------------------------------------------------------------------------
 // MAIN
@@ -66,16 +98,86 @@ void setup() {
   setupLCD();
 
   setupRotaryEncoder();
+
+  // enty point for main state machine
+  main_state = state_set_frequency;
+  main_menu = main_state;
 }
 
 void loop() {
   long time = micros(); // once to keep consistent timing over the loop
 
-  // only update display if value changed
-  if (rot_counter != rot_previousCounter) {
-    rot_previousCounter = rot_counter;
-    printFrequency(rot_counter);
+  switch (main_state)
+  {
+    case state_set_frequency:
+      // only update display if value changed
+      if (rot_counter != rot_previousCounter) {
+
+        // replace with acceleration
+        main_frequency = main_frequency + (rot_counter - rot_previousCounter);
+
+        if (main_frequency >= MAX_FREQUENCY_VALUE) {
+          main_frequency = MAX_FREQUENCY_VALUE;
+        } else if (main_frequency <= MIN_FREQUENCY_VALUE) {
+          main_frequency = MIN_FREQUENCY_VALUE;
+        }
+
+        rot_previousCounter = rot_counter;
+        printFrequency(main_frequency);
+
+        if (rot_autoset) {
+          //setFrequency(main_frequency);
+        }
+      }
+      break;
+
+    case state_set_dutycycle:
+      // only update display if value changed
+      if (rot_counter != rot_previousCounter) {
+
+        // replace with acceleration
+        main_dutycycle = main_dutycycle + (rot_counter - rot_previousCounter);
+
+        if (main_dutycycle >= MAX_DUTYCYCLE_VALYE) {
+          main_dutycycle = MAX_DUTYCYCLE_VALYE;
+        } else if (main_dutycycle <= MIN_DUTYCYCLE_VALYE) {
+          main_dutycycle = MIN_DUTYCYCLE_VALYE;
+        }
+
+        rot_previousCounter = rot_counter;
+        printDutyCycle(main_dutycycle);
+
+        if (rot_autoset) {
+          //setFrequency(main_frequency);
+        }
+      }
+      break;
+    
+    case state_reference_output:
+      // never update display, text is only put there when entering this menu
+      break;
+    
+    case state_options:
+      // only update display if value changed
+      if (rot_counter != rot_previousCounter) {
+        rot_previousCounter = rot_counter;
+        //printOption(rot_counter);
+      }
+      break;
+    
+    case state_menu:
+      // only update display if value changed
+      if (rot_counter != rot_previousCounter) {
+        rot_previousCounter = rot_counter;
+        //printMenu(rot_counter);
+      }
+      break;
+    
+    default:
+      break;
   }
+
+  delay(10);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -201,6 +303,48 @@ void printFrequency(int freq) {
   lcd.print(" Hz");
 }
 
+void printDutyCycle(int dc) {
+  // print the top row
+  lcd.setCursor(0, 0);
+  lcd.print("DutyCycle:");
+
+  // set cursor on second line
+  lcd.setCursor(8, 1);
+
+  int dc_temp = dc;
+
+  int tens = 0;
+  int ones = 0;
+
+  if (dc_temp >= 10) {
+    tens = floor(dc_temp / 10);
+  }
+
+  dc_temp = dc_temp - tens * 10;
+
+  ones = dc_temp;
+
+  if (tens != 0) {
+    // leading blank spaces
+    if (tens >= 100) {
+      lcd.print(" ");
+    } else if (tens >= 10) {
+      lcd.print("  ");
+    } else {
+      lcd.print("   ");
+    }
+    lcd.print(tens);
+    // tens decimal point
+    lcd.print(".");
+  } else {
+    // leading blank spaces, a zero and a decimal point
+    lcd.print("   0.");
+  }
+
+  lcd.print(ones);
+  lcd.print(" %");
+}
+
 void readEncoder()
 {
   static uint8_t previousState = 3;
@@ -214,21 +358,9 @@ void readEncoder()
   if (newState != previousState) {
     if (newState == 3 && previousState == 2 && tick) {
       rot_counter = rot_counter + 1;
-      if (rot_counter >= MAX_COUNTER_VALUE) {
-        rot_counter = MAX_COUNTER_VALUE;
-      }
-      if (rot_autoset) {
-        setFrequency(rot_counter);
-      }
       tick = false;
     } else if (newState == 3 && previousState == 1 && tick) {
       rot_counter = rot_counter - 1;
-      if (rot_counter <= MIN_COUNTER_VALUE) {
-        rot_counter = MIN_COUNTER_VALUE;
-      }
-      if (rot_autoset) {
-        setFrequency(rot_counter);
-      }
       tick = false;
     } else if (newState == 2 && previousState == 0 && !tick) {
       tick = true;
