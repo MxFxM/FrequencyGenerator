@@ -69,6 +69,13 @@ volatile boolean rot_long_press = false;
 volatile boolean rot_short_press = false;
 
 // ------------------------------------------------------------------------------------------------
+// LEDs
+// ------------------------------------------------------------------------------------------------
+#define LED_YELLOW 16
+#define LED_GREEN 15
+#define LED_BLUE 14
+
+// ------------------------------------------------------------------------------------------------
 // State machine and menus
 // ------------------------------------------------------------------------------------------------
 enum main_states
@@ -86,8 +93,7 @@ enum main_options
   state_wait_gps,
   state_reset_cold,
   state_reset_warm,
-  state_reset_hot,
-  state_exit_options
+  state_reset_hot
 } main_option;
 
 int main_frequency = 1;
@@ -95,6 +101,11 @@ int main_dutycycle = 500;
 main_states main_menu;
 
 boolean option_autoset = false;
+boolean option_waitgps = true;
+
+boolean error = false;
+boolean locked = false;
+boolean enabled = false;
 
 // ------------------------------------------------------------------------------------------------
 // MAIN
@@ -116,6 +127,10 @@ void setup() {
 
 void loop() {
   long time = micros(); // once to keep consistent timing over the loop
+
+  digitalWriteFast(LED_YELLOW, error);
+  digitalWriteFast(LED_GREEN, locked);
+  digitalWriteFast(LED_BLUE, enabled);
 
   main_states next_state = main_state;
 
@@ -143,6 +158,7 @@ void loop() {
       } else if (rot_long_press) {
         main_menu = state_set_frequency;
         next_state = state_menu;
+        printMenu();
         rot_long_press = false;
       } else if (rot_short_press) {
         if (!option_autoset) {
@@ -174,6 +190,7 @@ void loop() {
       } else if (rot_long_press) {
         main_menu = state_set_dutycycle;
         next_state = state_menu;
+        printMenu();
         rot_long_press = false;
       } else if (rot_short_press) {
         if (!option_autoset) {
@@ -188,6 +205,7 @@ void loop() {
       if (rot_long_press) {
         main_menu = state_reference_output;
         next_state = state_menu;
+        printMenu();
         rot_long_press = false;
       } else if (rot_short_press) {
         // does nothing here
@@ -198,8 +216,84 @@ void loop() {
     case state_options:
       // only update display if value changed
       if (rot_counter != rot_previousCounter) {
+
+        boolean up = false;
+        main_options next_option;
+        if (rot_counter - rot_previousCounter > 0) {
+          up = true;
+        }
+
+        switch (main_option)
+        {
+        case state_autoset:
+          if (up) {next_option = state_wait_gps;}
+          else    {next_option = state_autoset;}
+          break;
+
+        case state_wait_gps:
+          if (up) {next_option = state_reset_cold;}
+          else    {next_option = state_autoset;}
+          break;
+        
+        case state_reset_cold:
+          if (up) {next_option = state_reset_warm;}
+          else    {next_option = state_wait_gps;}
+          break;
+        
+        case state_reset_warm:
+          if (up) {next_option = state_reset_hot;}
+          else    {next_option = state_reset_cold;}
+          break;
+
+        case state_reset_hot:
+          if (up) {next_option = state_reset_hot;}
+          else    {next_option = state_reset_warm;}
+          break;
+        
+        default:
+          next_option = state_autoset;
+          break;
+        }
+
+        main_option = next_option;
         rot_previousCounter = rot_counter;
-        //printOption(rot_counter);
+
+        printOptions();
+
+      } else if (rot_short_press) {
+        switch (main_option)
+        {
+        case state_autoset:
+          option_autoset = !option_autoset;
+          printOptions();
+          break;
+
+        case state_wait_gps:
+          option_waitgps = !option_waitgps;
+          printOptions();
+          break;
+        
+        case state_reset_cold:
+          // send reset to gps module
+          break;
+        
+        case state_reset_warm:
+          // send reset to gps module
+          break;
+
+        case state_reset_hot:
+          // send reset to gps module
+          break;
+        
+        default:
+          break;
+        }
+        rot_short_press = false;
+      } else if (rot_long_press) {
+        main_menu = state_options;
+        next_state = state_menu;
+        printMenu();
+        rot_long_press = false;
       }
       break;
     
@@ -484,6 +578,43 @@ void printMenu(void) {
 void printOptions(void) {
   lcd.setCursor(0, 0);
   lcd.print("Options:        ");
+
+  lcd.setCursor(0, 1);
+  switch (main_option)
+  {
+  case state_autoset:
+    lcd.print("autoset");
+    if (option_autoset) {
+      lcd.print("       on");
+    } else {
+      lcd.print("      off");
+    }
+    break;
+    
+  case state_wait_gps:
+    lcd.print("wait for GPS");
+    if (option_waitgps) {
+      lcd.print("  on");
+    } else {
+      lcd.print(" off");
+    }
+    break;
+  
+  case state_reset_cold:
+    lcd.print("reset GPS   cold");
+    break;
+  
+  case state_reset_warm:
+    lcd.print("reset GPS   warm");
+    break;
+  
+  case state_reset_hot:
+    lcd.print("reset GPS    hot");
+    break;
+  
+  default:
+    break;
+  }
 }
 
 void readEncoder(void)
