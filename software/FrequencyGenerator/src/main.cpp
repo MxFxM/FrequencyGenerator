@@ -5,6 +5,10 @@
 // ------------------------------------------------------------------------------------------------
 //#define DEBUG_MODE
 
+// settings for push button debounce
+#define BUTTON_DEBOUNCE_MICROS 10000
+#define BUTTON_LONG_PRESS_MICROS 500000
+
 // settings for the frequency counter
 #define MAX_FREQUENCY_VALUE 10000000
 #define MIN_FREQUENCY_VALUE 1
@@ -39,6 +43,8 @@ LiquidCrystal lcd(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 void setupLCD(void);
 void printFrequency(int freq);
 void printDutyCycle(int dc);
+void printMenu(void);
+void printOptions(void);
 
 // ------------------------------------------------------------------------------------------------
 // Rotary Encoder
@@ -52,13 +58,15 @@ void printDutyCycle(int dc);
 // functions
 void setupRotaryEncoder(void);
 void readEncoder(void);
-void confirmFrequency(void);
+void pressEncoder(void);
 void setFrequency(int frequency);
 
 // variables
 volatile int rot_counter = 0;
 volatile int rot_previousCounter = 1;
-volatile boolean rot_autoset = false;
+volatile long rot_pressTime = 0;
+volatile boolean rot_long_press = false;
+volatile boolean rot_short_press = false;
 
 // ------------------------------------------------------------------------------------------------
 // State machine and menus
@@ -82,9 +90,11 @@ enum main_options
   state_exit_options
 } main_option;
 
-int main_frequency = 2;
-int main_dutycycle = 501;
+int main_frequency = 1;
+int main_dutycycle = 500;
 main_states main_menu;
+
+boolean option_autoset = false;
 
 // ------------------------------------------------------------------------------------------------
 // MAIN
@@ -107,6 +117,8 @@ void setup() {
 void loop() {
   long time = micros(); // once to keep consistent timing over the loop
 
+  main_states next_state = main_state;
+
   switch (main_state)
   {
     case state_set_frequency:
@@ -125,9 +137,18 @@ void loop() {
         rot_previousCounter = rot_counter;
         printFrequency(main_frequency);
 
-        if (rot_autoset) {
+        if (option_autoset) {
           //setFrequency(main_frequency);
         }
+      } else if (rot_long_press) {
+        main_menu = state_set_frequency;
+        next_state = state_menu;
+        rot_long_press = false;
+      } else if (rot_short_press) {
+        if (!option_autoset) {
+          // set frequency
+        }
+        rot_short_press = false;
       }
       break;
 
@@ -147,14 +168,31 @@ void loop() {
         rot_previousCounter = rot_counter;
         printDutyCycle(main_dutycycle);
 
-        if (rot_autoset) {
+        if (option_autoset) {
           //setFrequency(main_frequency);
         }
+      } else if (rot_long_press) {
+        main_menu = state_set_dutycycle;
+        next_state = state_menu;
+        rot_long_press = false;
+      } else if (rot_short_press) {
+        if (!option_autoset) {
+          // set dutycycle
+        }
+        rot_short_press = false;
       }
       break;
     
     case state_reference_output:
       // never update display, text is only put there when entering this menu
+      if (rot_long_press) {
+        main_menu = state_reference_output;
+        next_state = state_menu;
+        rot_long_press = false;
+      } else if (rot_short_press) {
+        // does nothing here
+        rot_short_press = false;
+      }
       break;
     
     case state_options:
@@ -205,41 +243,47 @@ void loop() {
         main_menu = next_menu;
         rot_previousCounter = rot_counter;
 
-        lcd.setCursor(0, 0);
-        lcd.print("Main Menu:      ");
+        printMenu();
 
+        //printMenu(rot_counter);
+      } else if (rot_short_press) {
         switch (main_menu)
         {
         case state_set_frequency:
-          lcd.setCursor(0, 1);
-          lcd.print("   set frequency");
+          next_state = state_set_frequency;
+          printFrequency(main_frequency);
           break;
 
         case state_set_dutycycle:
-          lcd.setCursor(0, 1);
-          lcd.print("   set dutycycle");
+          next_state = state_set_dutycycle;
+          printDutyCycle(main_dutycycle);
           break;
         
         case state_reference_output:
+          next_state = state_reference_output;
+          lcd.setCursor(0, 0);
+          lcd.print("Reference Output");
           lcd.setCursor(0, 1);
-          lcd.print("reference output");
+          lcd.print("10 MHz    50.0 %");
           break;
         
         case state_options:
-          lcd.setCursor(0, 1);
-          lcd.print("         options");
+          next_state = state_options;
+          printOptions();
           break;
         
         default:
           break;
         }
-        //printMenu(rot_counter);
+        rot_short_press = false;
       }
       break;
     
     default:
       break;
   }
+
+  main_state = next_state;
 
   delay(10);
 }
@@ -261,7 +305,7 @@ void setupRotaryEncoder(void) {
   // interrupts
   attachInterrupt(ROT_CK, readEncoder, CHANGE);
   attachInterrupt(ROT_DT, readEncoder, CHANGE);
-  attachInterrupt(ROT_SW, confirmFrequency, FALLING);
+  attachInterrupt(ROT_SW, pressEncoder, CHANGE);
 }
 
 void printFrequency(int freq) {
@@ -409,7 +453,40 @@ void printDutyCycle(int dc) {
   lcd.print(" %");
 }
 
-void readEncoder()
+void printMenu(void) {
+  lcd.setCursor(0, 0);
+  lcd.print("Main Menu:      ");
+
+  lcd.setCursor(0, 1);
+  switch (main_menu)
+  {
+  case state_set_frequency:
+    lcd.print("   set frequency");
+    break;
+
+  case state_set_dutycycle:
+    lcd.print("   set dutycycle");
+    break;
+  
+  case state_reference_output:
+    lcd.print("reference output");
+    break;
+  
+  case state_options:
+    lcd.print("         options");
+    break;
+  
+  default:
+    break;
+  }
+}
+
+void printOptions(void) {
+  lcd.setCursor(0, 0);
+  lcd.print("Options:        ");
+}
+
+void readEncoder(void)
 {
   static uint8_t previousState = 3;
   static boolean tick = false;
@@ -438,17 +515,26 @@ void readEncoder()
   }
 }
 
-void confirmFrequency() {
-  static long lastConfirm = 0;
+void pressEncoder(void) {
+  static long lastChange = 0;
+
   long time = micros();
 
-  if (time > lastConfirm + 100000) {
-    setFrequency(rot_counter);
-    #ifdef DEBUG_MODE
-    Serial.print("Confirmed: ");
-    #endif
-    Serial.println(rot_counter);
-    lastConfirm = time;
+  if (time > lastChange + BUTTON_DEBOUNCE_MICROS) {
+    if (!digitalReadFast(ROT_SW)) { // pressed
+      rot_pressTime = time;
+      lastChange = time;
+    } else { // released
+      if (time > rot_pressTime + BUTTON_LONG_PRESS_MICROS) {
+        rot_long_press = true;
+        rot_short_press = false;
+        lastChange = time;
+      } else {
+        rot_long_press = false;
+        rot_short_press = true;
+        lastChange = time;
+      }
+    }
   }
 }
 
