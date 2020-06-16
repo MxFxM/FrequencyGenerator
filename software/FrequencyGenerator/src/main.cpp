@@ -100,8 +100,8 @@ void setup() {
   setupRotaryEncoder();
 
   // enty point for main state machine
-  main_state = state_set_frequency;
-  main_menu = main_state;
+  main_state = state_menu;
+  main_menu = state_set_frequency;
 }
 
 void loop() {
@@ -168,7 +168,71 @@ void loop() {
     case state_menu:
       // only update display if value changed
       if (rot_counter != rot_previousCounter) {
+
+        boolean up = false;
+        main_states next_menu;
+        if (rot_counter - rot_previousCounter > 0) {
+          up = true;
+        }
+
+        switch (main_menu)
+        {
+        case state_set_frequency:
+          if (up) {next_menu = state_set_dutycycle;}
+          else    {next_menu = state_set_frequency;}
+          break;
+
+        case state_set_dutycycle:
+          if (up) {next_menu = state_reference_output;}
+          else    {next_menu = state_set_frequency;}
+          break;
+        
+        case state_reference_output:
+          if (up) {next_menu = state_options;}
+          else    {next_menu = state_set_dutycycle;}
+          break;
+        
+        case state_options:
+          if (up) {next_menu = state_options;}
+          else    {next_menu = state_reference_output;}
+          break;
+        
+        default:
+          next_menu = state_set_frequency;
+          break;
+        }
+
+        main_menu = next_menu;
         rot_previousCounter = rot_counter;
+
+        lcd.setCursor(0, 0);
+        lcd.print("Main Menu:      ");
+
+        switch (main_menu)
+        {
+        case state_set_frequency:
+          lcd.setCursor(0, 1);
+          lcd.print("   set frequency");
+          break;
+
+        case state_set_dutycycle:
+          lcd.setCursor(0, 1);
+          lcd.print("   set dutycycle");
+          break;
+        
+        case state_reference_output:
+          lcd.setCursor(0, 1);
+          lcd.print("reference output");
+          break;
+        
+        case state_options:
+          lcd.setCursor(0, 1);
+          lcd.print("         options");
+          break;
+        
+        default:
+          break;
+        }
         //printMenu(rot_counter);
       }
       break;
@@ -203,7 +267,7 @@ void setupRotaryEncoder(void) {
 void printFrequency(int freq) {
   // print the top row
   lcd.setCursor(0, 0);
-  lcd.print("Frequency:");
+  lcd.print("Frequency:      ");
 
   // set cursor on second line
   lcd.setCursor(0, 1);
@@ -306,10 +370,10 @@ void printFrequency(int freq) {
 void printDutyCycle(int dc) {
   // print the top row
   lcd.setCursor(0, 0);
-  lcd.print("DutyCycle:");
+  lcd.print("DutyCycle:      ");
 
   // set cursor on second line
-  lcd.setCursor(8, 1);
+  lcd.setCursor(0, 1);
 
   int dc_temp = dc;
 
@@ -327,18 +391,18 @@ void printDutyCycle(int dc) {
   if (tens != 0) {
     // leading blank spaces
     if (tens >= 100) {
-      lcd.print(" ");
+      lcd.print("         ");
     } else if (tens >= 10) {
-      lcd.print("  ");
+      lcd.print("          ");
     } else {
-      lcd.print("   ");
+      lcd.print("           ");
     }
     lcd.print(tens);
     // tens decimal point
     lcd.print(".");
   } else {
     // leading blank spaces, a zero and a decimal point
-    lcd.print("   0.");
+    lcd.print("           0.");
   }
 
   lcd.print(ones);
