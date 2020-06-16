@@ -1,108 +1,43 @@
 #include <Arduino.h>
 
-// include the library code:
-#include <LiquidCrystal.h>
+// library for the lcd
 // the library uses delays but for my application that does not matter
+// i might remove the delays later tho
+#include <LiquidCrystal.h>
 
-// initialize the library by associating any needed LCD interface pin
-// with the arduino pin number it is connected to
-const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
-LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+// the pins for the lcd
+#define LCD_RS 12
+#define LCD_EN 11
+#define LCD_D4 5
+#define LCD_D5 4
+#define LCD_D6 3
+#define LCD_D7 2
 
+// some other values used for the display
+#define LCD_UPDATE_TIME 100000
 
+// create lcd object
+LiquidCrystal lcd(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 
-
-#define pin1 0
-#define pin2 1
-
-#define pinBuzzer 7
-
-void pinInterrupt(void);
-
+// the pins for the rotary encoder
+#define ROT_DT 0
+#define ROT_CK 1
+#define ROT_SW 2
 
 void printFrequency(int freq);
 
 void setup() {
-  pinMode(pin1, INPUT);
-  pinMode(pin2, INPUT);
-
-  pinMode(pinBuzzer, OUTPUT);
-
-  attachInterrupt(pin1, pinInterrupt, CHANGE);
+  // set up the lcd with width and height
+  lcd.begin(16, 2);
 }
-
-volatile int change = 0;
-int count = 1;
-boolean consecutive = false;
-int integrator = 0;
-long last_change_time = 0;
-int last_change = 0;
-boolean buzzerState = false;
-
-long last_display_update = 0;
 
 void loop() {
   long time = micros(); // once to keep consistent timing over the loop
-
-  if (change != 0) {
-    // reset acceleration if direction was reversed
-    if (change != last_change) {
-      integrator = 0;
-      last_change = change;
-    }
-
-    // increase integrator
-    integrator = integrator+1;
-
-    // make integrator exponential
-    int expo = floor(integrator/10.0);
-
-    // limit exponent
-    if (expo >= 5) { // not faster than 100k per count. thats fast enough for a value 0 < x < 20M
-      expo = 5;
-    }
-
-    // increase count
-    count = count+change*pow(10, expo);
-
-    // limit count
-    if (count >= 20000000) {
-      count = 20000000;
-    } else if (count <= 1) {
-      count = 1;
-    }
-
-    // reset change
-    change = 0;
-
-    // save time for reset of integrator
-    last_change_time = time + 500000; // one half second to reset exponential acceleration
-
-    // toggle the buzzer
-    buzzerState = !buzzerState;
-    digitalWriteFast(pinBuzzer, buzzerState);
-  }
-
-  // reset integrator if time is over
-  if (time > last_change_time) {
-    integrator = 0;
-  }
-
-  if (time > last_display_update) {
-    // print value
-    printFrequency(count);
-
-    last_display_update = time + 200000;
-    last_change_time = last_change_time + 200000; // more time since display update takes a while
-  }
-
-  delay(10);
 }
 
 void printFrequency(int freq) {
-  // set up the LCD's number of columns and rows:
-  lcd.begin(16, 2);
-  // Print a message to the LCD.
+  // print the top row
+  lcd.setCursor(0, 0);
   lcd.print("Frequency:");
 
   // set cursor on second line
@@ -201,15 +136,4 @@ void printFrequency(int freq) {
 
   // lcd.print(freq);
   lcd.print(" Hz");
-}
-
-void pinInterrupt(void) {
-  boolean a = digitalReadFast(pin1);
-  boolean b = digitalReadFast(pin2);
-
-  if (a == b) {
-    change = -1;
-  } else {
-    change = +1;
-  }
 }
